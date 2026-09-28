@@ -61,15 +61,36 @@ class OpenAIRunner:
         if block_msg is not None:
             return block_msg
 
+        from openai import NotFoundError
+
         client = self._client()
-        completion = client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": agent.instruction},
-                {"role": "user", "content": user_message},
-            ],
-            temperature=self.temperature,
-        )
+        messages = [
+            {"role": "system", "content": agent.instruction},
+            {"role": "user", "content": user_message},
+        ]
+        try:
+            completion = client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=self.temperature,
+            )
+        except NotFoundError as error:
+            if not (
+                self.provider == "openrouter"
+                and self.model == "liquid/lfm-2.5-2.6b"
+                and "no endpoints found" in str(error).casefold()
+            ):
+                raise
+            self.model = f"{self.model}:free"
+            print(
+                "OpenRouter has no default endpoint for liquid/lfm-2.5-2.6b; "
+                "retrying the same model via liquid/lfm-2.5-2.6b:free."
+            )
+            completion = client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=self.temperature,
+            )
         text = (completion.choices[0].message.content or "").strip()
 
         for hook in self.output_hooks:

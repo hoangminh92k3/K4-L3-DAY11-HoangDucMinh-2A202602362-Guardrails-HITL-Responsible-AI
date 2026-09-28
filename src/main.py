@@ -53,6 +53,8 @@ async def part2_guardrails():
 
 async def part3_assignment_suite():
     """Checkpoint 3: defense suite → outputs/results.json."""
+    from openai import APIStatusError
+
     print("\n" + "=" * 60)
     print("CHECKPOINT 3: Assignment suite → outputs/*.json")
     print("=" * 60)
@@ -78,6 +80,27 @@ async def part3_assignment_suite():
             "  python src/main.py --part 3"
         )
         print(f"Detail: {e}")
+        return None
+    except APIStatusError as e:
+        if e.status_code == 429:
+            error_body = e.body if isinstance(e.body, dict) else {}
+            error_detail = error_body.get("error", {})
+            metadata = error_detail.get("metadata", {})
+            retry_after = metadata.get("retry_after_seconds")
+            wait_message = (
+                f" Hãy thử lại sau khoảng {retry_after} giây."
+                if retry_after is not None
+                else " Hãy thử lại sau hoặc kiểm tra quota/provider key."
+            )
+            print(
+                "Checkpoint 3 chưa hoàn tất: OpenRouter/provider đang rate-limit."
+                f"{wait_message} Chưa tạo results.json, audit_log.json, metrics.json."
+            )
+        else:
+            print(
+                "Checkpoint 3 chưa hoàn tất: OpenRouter trả về "
+                f"HTTP {e.status_code}. Kiểm tra model/provider và API key."
+            )
         return None
 
 
